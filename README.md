@@ -59,3 +59,7 @@ Django asosida yaratilgan interaktiv savollar platformasi. Unda 16 ta maxfiy raq
   ```bash
   python manage.py test
   ```
+- Static fayllarni production uchun to'plash:
+  ```bash
+  python manage.py collectstatic --noinput
+  ```
