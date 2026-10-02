@@ -1,0 +1,540 @@
+{% extends 'base.html' %}
+
+{% block title %}Quiz Doskasi &bull; 16 ta Savol{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* 3D Card styles and animations */
+    .perspective-1000 {
+        perspective: 1000px;
+    }
+    .quiz-card {
+        transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        transform-style: preserve-3d;
+    }
+    .quiz-card.unopened:hover {
+        transform: translateY(-8px) scale(1.03);
+        box-shadow: 0 20px 35px -10px rgba(99, 102, 241, 0.4), 0 0 20px rgba(168, 85, 247, 0.25);
+    }
+    .quiz-card.opened {
+        background: linear-gradient(145deg, #090d16 0%, #111827 100%);
+        opacity: 0.45;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+        filter: grayscale(40%);
+    }
+    /* Modal smooth zoom */
+    .modal-enter {
+        animation: modalZoomIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes modalZoomIn {
+        from {
+            opacity: 0;
+            transform: scale(0.85) translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col">
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            
+            <!-- Brand Title -->
+            <div class="flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 border border-indigo-400/20">
+                    <i class="fa-solid fa-gamepad text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="heading-font text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        Quiz <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Arena</span>
+                        <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">16 Savol</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Har bir raqam ostida maxfiy savol yashiringan</p>
+                </div>
+            </div>
+
+            <!-- Stats Counters -->
+            <div class="flex items-center gap-2 sm:gap-4 bg-slate-900/90 border border-slate-800 px-3 sm:px-4 py-1.5 rounded-2xl shadow-inner">
+                <div class="text-center px-2">
+                    <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Jami</span>
+                    <span class="heading-font text-sm sm:text-base font-extrabold text-white" id="stat-total">{{ total_count }}</span>
+                </div>
+                <div class="w-px h-6 bg-slate-800"></div>
+                <div class="text-center px-2">
+                    <span class="block text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Ochilgan</span>
+                    <span class="heading-font text-sm sm:text-base font-extrabold text-emerald-400" id="stat-opened">{{ opened_count }}</span>
+                </div>
+                <div class="w-px h-6 bg-slate-800"></div>
+                <div class="text-center px-2">
+                    <span class="block text-[10px] font-semibold text-indigo-400 uppercase tracking-wider">Qolgan</span>
+                    <span class="heading-font text-sm sm:text-base font-extrabold text-indigo-400" id="stat-remaining">{{ remaining_count }}</span>
+                </div>
+            </div>
+
+            <!-- User and Actions -->
+            <div class="flex items-center gap-2.5">
+                <!-- Sound Toggle -->
+                <button type="button" id="soundToggleBtn" title="Ovozni yoqish/o'chirish" class="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-volume-high text-sm" id="soundIcon"></i>
+                </button>
+
+                <!-- Reset Board Button -->
+                <button type="button" onclick="openResetModal()" title="Doskani qayta boshlash" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 text-xs font-semibold flex items-center gap-2 transition-all">
+                    <i class="fa-solid fa-rotate-right text-xs"></i>
+                    <span class="hidden md:inline">Qayta boshlash</span>
+                </button>
+
+                <!-- User Badge -->
+                <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 py-1.5 px-3 rounded-xl">
+                    <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shadow-sm">
+                        {{ user.username|make_list|first|upper }}
+                    </div>
+                    <span class="text-xs font-semibold text-slate-200 hidden sm:inline">{{ user.username }}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold hidden lg:inline">Admin</span>
+                </div>
+
+                <!-- Logout Form -->
+                <a href="{% url 'logout' %}" class="w-10 h-10 rounded-xl bg-slate-900 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 flex items-center justify-center transition-colors" title="Chiqish">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Progress Bar Line -->
+        <div class="w-full bg-slate-900 h-1">
+            <div id="progressBar" class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-1 transition-all duration-500" style="width: {{ progress_percentage }}%;"></div>
+        </div>
+    </header>
+
+    <!-- Main Board Area -->
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col justify-center">
+        
+        <!-- Board Introduction Header -->
+        <div class="text-center mb-8">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-3">
+                <i class="fa-solid fa-sparkles text-xs"></i> 16 ta maxfiy savollar doskasi
+            </span>
+            <h2 class="heading-font text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+                Raqamlardan birini tanlang
+            </h2>
+            <p class="text-sm text-slate-400 mt-2 max-w-xl mx-auto">
+                Har bir raqamning usti yopiq. Tanlaganingizdan so'ng uning savoli ochiladi va bu raqamni <strong class="text-rose-400 font-semibold">qayta tanlab bo'lmaydi</strong>.
+            </p>
+        </div>
+
+        <!-- 4x4 Grid of 16 Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6 perspective-1000 max-w-5xl mx-auto w-full">
+            {% for card in cards %}
+            <div 
+                id="card-{{ card.number }}"
+                data-number="{{ card.number }}"
+                data-opened="{% if card.is_opened %}true{% else %}false{% endif %}"
+                onclick="handleCardClick({{ card.number }})"
+                class="quiz-card relative rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer select-none border min-h-[150px] sm:min-h-[175px]
+                    {% if card.is_opened %}
+                        opened border-slate-800
+                    {% else %}
+                        unopened bg-gradient-to-br from-slate-900/90 via-indigo-950/40 to-slate-900/90 border-slate-700/60 shadow-xl shadow-indigo-950/20 hover:border-indigo-500/60
+                    {% endif %}
+                "
+            >
+                <!-- Decorative Corner Glow -->
+                <div class="absolute top-0 right-0 w-20 h-20 bg-indigo-500/10 rounded-bl-full pointer-events-none {% if card.is_opened %}hidden{% endif %}"></div>
+
+                <!-- Card Badge: SAVOL -->
+                <span class="card-badge text-[11px] font-bold tracking-widest uppercase mb-1
+                    {% if card.is_opened %}
+                        text-slate-500
+                    {% else %}
+                        text-indigo-400/90
+                    {% endif %}
+                ">
+                    Savol
+                </span>
+
+                <!-- Giant Number Display (1 to 16) -->
+                <div class="heading-font text-4xl sm:text-5xl lg:text-6xl font-black my-1 transition-transform group-hover:scale-110
+                    {% if card.is_opened %}
+                        text-slate-600 line-through decoration-rose-500/50 decoration-4
+                    {% else %}
+                        text-transparent bg-clip-text bg-gradient-to-b from-white via-indigo-100 to-indigo-300 drop-shadow-[0_2px_10px_rgba(99,102,241,0.5)]
+                    {% endif %}
+                ">
+                    {{ card.number }}
+                </div>
+
+                <!-- Bottom Status Pill -->
+                <div class="card-status mt-2">
+                    {% if card.is_opened %}
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-rose-400 border border-slate-700 text-[11px] font-bold">
+                        <i class="fa-solid fa-lock text-[10px]"></i> Ochilgan
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                        <i class="fa-solid fa-eye-slash text-[10px]"></i> Yopiq
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    </main>
+</div>
+
+<!-- ============================================== -->
+<!-- QUESTION REVEAL MODAL                          -->
+<!-- ============================================== -->
+<div id="questionModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-xl opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-indigo-500/40 rounded-3xl p-6 sm:p-10 shadow-2xl shadow-indigo-950/80 transform scale-90 transition-all duration-300" id="modalCard">
+        
+        <!-- Ambient Radial Glow -->
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-5 mb-6 relative z-10">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30">
+                    <i class="fa-solid fa-quote-left text-xl"></i>
+                </div>
+                <div>
+                    <span class="text-xs uppercase font-extrabold tracking-widest text-indigo-400 block">Intellektual Savol</span>
+                    <h3 class="heading-font text-2xl font-black text-white" id="modalQuestionNumber">
+                        Savol #1
+                    </h3>
+                </div>
+            </div>
+
+            <!-- Reading Timer Widget -->
+            <div class="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3.5 py-2 rounded-2xl">
+                <i class="fa-solid fa-stopwatch text-indigo-400 text-sm"></i>
+                <span class="text-sm font-bold font-mono text-slate-200" id="timerDisplay">00:45</span>
+            </div>
+        </div>
+
+        <!-- Question Text Display Area -->
+        <div class="my-8 py-6 px-6 sm:px-8 bg-slate-950/70 border border-slate-800/80 rounded-2xl relative z-10 shadow-inner">
+            <p class="heading-font text-xl sm:text-2xl md:text-3xl font-bold text-white text-center leading-relaxed" id="modalQuestionText">
+                Savol yuklanmoqda...
+            </p>
+        </div>
+
+        <!-- Notice Badge -->
+        <div class="mb-6 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2.5 text-xs text-amber-200/90 relative z-10">
+            <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+            <span>Ushbu savol ochildi va doskada bloklandi. Qayta tanlab bo'lmaydi!</span>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="flex flex-col sm:flex-row items-center justify-end gap-3 relative z-10">
+            <button 
+                type="button" 
+                onclick="closeQuestionModal()" 
+                class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            >
+                <i class="fa-solid fa-check"></i>
+                <span>Tushunarli &bull; Doskaga qaytish</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================== -->
+<!-- RESET CONFIRMATION MODAL                       -->
+<!-- ============================================== -->
+<div id="resetModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-200">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+        <div class="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-2xl mx-auto mb-4">
+            <i class="fa-solid fa-arrow-rotate-left"></i>
+        </div>
+        <h3 class="heading-font text-xl font-bold text-white text-center mb-2">
+            Doskani qayta boshlaysizmi?
+        </h3>
+        <p class="text-sm text-slate-400 text-center mb-6">
+            Barcha 16 ta savol tasodifiy (random) tartibda qayta aralashtiriladi va barcha kartochkalar yopiladi.
+        </p>
+
+        <form method="POST" action="{% url 'reset_quiz' %}" class="flex items-center gap-3">
+            {% csrf_token %}
+            <button type="button" onclick="closeResetModal()" class="w-1/2 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm transition-colors">
+                Bekor qilish
+            </button>
+            <button type="submit" class="w-1/2 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg shadow-rose-600/30 transition-colors">
+                Ha, tozalash
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- CSRF Token for fetch requests -->
+<div id="csrfTokenData" data-token="{{ csrf_token }}" class="hidden"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Audio synthesis using Web Audio API (no external asset downloads required!)
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    function getAudioContext() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        return audioCtx;
+    }
+
+    function playChime() {
+        if (!soundEnabled) return;
+        try {
+            const ctx = getAudioContext();
+            const now = ctx.currentTime;
+            
+            // Pleasant fanfare chord
+            [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now + i * 0.08);
+
+                gain.gain.setValueAtTime(0, now + i * 0.08);
+                gain.gain.linearRampToValueAtTime(0.18, now + i * 0.08 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.9);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now + i * 0.08);
+                osc.stop(now + i * 0.08 + 0.9);
+            });
+        } catch(e) {
+            console.log('Audio playback prevented or unsupported');
+        }
+    }
+
+    function playClick() {
+        if (!soundEnabled) return;
+        try {
+            const ctx = getAudioContext();
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.05);
+        } catch(e){}
+    }
+
+    // Sound toggle button
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const soundIcon = document.getElementById('soundIcon');
+    soundToggleBtn?.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        if (soundEnabled) {
+            soundIcon.classList.replace('fa-volume-xmark', 'fa-volume-high');
+            soundIcon.classList.remove('text-rose-400');
+            playClick();
+        } else {
+            soundIcon.classList.replace('fa-volume-high', 'fa-volume-xmark');
+            soundIcon.classList.add('text-rose-400');
+        }
+    });
+
+    // Timer logic in Modal
+    let timerInterval = null;
+    let secondsLeft = 45;
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        secondsLeft = 45;
+        updateTimerDisplay();
+        timerInterval = setInterval(() => {
+            secondsLeft--;
+            updateTimerDisplay();
+            if (secondsLeft <= 0) {
+                clearInterval(timerInterval);
+            }
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+    }
+
+    function updateTimerDisplay() {
+        const display = document.getElementById('timerDisplay');
+        if (!display) return;
+        const mins = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+        const secs = String(secondsLeft % 60).padStart(2, '0');
+        display.innerText = `${mins}:${secs}`;
+        if (secondsLeft <= 10) {
+            display.classList.add('text-rose-400', 'animate-pulse');
+        } else {
+            display.classList.remove('text-rose-400', 'animate-pulse');
+        }
+    }
+
+    // Card Click Handler
+    async function handleCardClick(number) {
+        const card = document.getElementById(`card-${number}`);
+        if (!card) return;
+
+        // Check if card is already opened
+        const isOpened = card.getAttribute('data-opened') === 'true';
+        if (isOpened) {
+            alert(`Savol #${number} allaqachon ochilgan va foydalanilgan! Qayta tanlay olmaysiz.`);
+            return;
+        }
+
+        playClick();
+
+        // Visual loading feedback on clicked card
+        card.classList.add('scale-95', 'opacity-70');
+
+        const csrfToken = document.getElementById('csrfTokenData').getAttribute('data-token');
+
+        try {
+            const response = await fetch(`/api/open/${number}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            });
+
+            const data = await response.json();
+
+            card.classList.remove('scale-95', 'opacity-70');
+
+            if (data.success) {
+                // Mark card as opened immediately
+                markCardAsOpened(number);
+
+                // Update counters
+                updateCounters(data.total_count, data.opened_count, data.remaining_count, data.progress_percentage);
+
+                // Play celebration sound
+                playChime();
+
+                // Open modal with question text
+                showQuestionModal(data.number, data.question_text);
+            } else {
+                alert(data.error || 'Xatolik yuz berdi!');
+            }
+        } catch (err) {
+            console.error('Xatolik:', err);
+            card.classList.remove('scale-95', 'opacity-70');
+            alert("Server bilan bog'lanishda xatolik yuz berdi!");
+        }
+    }
+
+    function markCardAsOpened(number) {
+        const card = document.getElementById(`card-${number}`);
+        if (!card) return;
+
+        card.setAttribute('data-opened', 'true');
+        card.classList.remove('unopened');
+        card.classList.add('opened');
+
+        // Update number styling to strike-through
+        const numElem = card.querySelector('.heading-font');
+        if (numElem) {
+            numElem.className = 'heading-font text-4xl sm:text-5xl lg:text-6xl font-black my-1 text-slate-600 line-through decoration-rose-500/50 decoration-4';
+        }
+
+        // Update badge
+        const badge = card.querySelector('.card-badge');
+        if (badge) {
+            badge.className = 'card-badge text-[11px] font-bold tracking-widest uppercase mb-1 text-slate-500';
+        }
+
+        // Update status pill to "Ochilgan"
+        const statusDiv = card.querySelector('.card-status');
+        if (statusDiv) {
+            statusDiv.innerHTML = `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-rose-400 border border-slate-700 text-[11px] font-bold">
+                    <i class="fa-solid fa-lock text-[10px]"></i> Ochilgan
+                </span>
+            `;
+        }
+
+        // Disable pointer events
+        card.style.pointerEvents = 'none';
+        card.style.cursor = 'not-allowed';
+    }
+
+    function updateCounters(total, opened, remaining, percentage) {
+        if (document.getElementById('stat-total')) document.getElementById('stat-total').innerText = total;
+        if (document.getElementById('stat-opened')) document.getElementById('stat-opened').innerText = opened;
+        if (document.getElementById('stat-remaining')) document.getElementById('stat-remaining').innerText = remaining;
+        const bar = document.getElementById('progressBar');
+        if (bar) bar.style.width = `${percentage}%`;
+    }
+
+    // Modal Display Functions
+    function showQuestionModal(number, questionText) {
+        const modal = document.getElementById('questionModal');
+        const modalCard = document.getElementById('modalCard');
+        const numberElem = document.getElementById('modalQuestionNumber');
+        const textElem = document.getElementById('modalQuestionText');
+
+        numberElem.innerText = `Savol #${number}`;
+        textElem.innerText = questionText;
+
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modal.classList.add('opacity-100');
+
+        modalCard.classList.remove('scale-90');
+        modalCard.classList.add('scale-100');
+
+        startTimer();
+    }
+
+    function closeQuestionModal() {
+        const modal = document.getElementById('questionModal');
+        const modalCard = document.getElementById('modalCard');
+
+        stopTimer();
+
+        modalCard.classList.remove('scale-100');
+        modalCard.classList.add('scale-90');
+
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    // Reset Modal
+    function openResetModal() {
+        playClick();
+        const modal = document.getElementById('resetModal');
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modal.classList.add('opacity-100');
+    }
+
+    function closeResetModal() {
+        const modal = document.getElementById('resetModal');
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    // Close modal on Escape key
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeQuestionModal();
+            closeResetModal();
+        }
+    });
+</script>
+{% endblock %}
