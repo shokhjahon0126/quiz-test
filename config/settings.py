@@ -54,9 +54,20 @@ INSTALLED_APPS = [
     'quiz',
 ]
 
+# Whitenoise o'rnatilganligini tekshirish (agar o'rnatilmagan bo'lsa ham loyiha qulamasligi uchun)
+try:
+    import whitenoise
+    USE_WHITENOISE = True
+except ImportError:
+    USE_WHITENOISE = False
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Production uchun static fayllarni yuqori tezlikda uzatish
+]
+if USE_WHITENOISE:
+    MIDDLEWARE.append('whitenoise.middleware.WhiteNoiseMiddleware')
+
+MIDDLEWARE += [
     'django.middleware.gzip.GZipMiddleware',  # HTML va ma'lumotlarni 10x siqib tezlashtirish
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
