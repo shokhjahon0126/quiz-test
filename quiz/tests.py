@@ -105,3 +105,15 @@ class QuizAppTests(TestCase):
         # Barcha kartochkalar yopilgan bo'lishi kerak
         self.assertEqual(GameCard.objects.filter(user=self.user, is_opened=True).count(), 0)
         self.assertEqual(GameCard.objects.filter(user=self.user, is_opened=False).count(), 16)
+
+    def test_celery_sample_task(self):
+        """Celery asinxron vazifalarini tekshirish"""
+        from quiz.tasks import sample_celery_task, send_quiz_reminder_task
+        res = sample_celery_task.apply(args=["TestUser"])
+        self.assertEqual(res.status, 'SUCCESS')
+        self.assertIn("TestUser", res.result)
+
+        res2 = send_quiz_reminder_task.apply(args=[self.user.id])
+        self.assertEqual(res2.status, 'SUCCESS')
+        self.assertIn(self.username, res2.result)
+
